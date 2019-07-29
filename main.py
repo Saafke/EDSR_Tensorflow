@@ -13,6 +13,7 @@ from tensorflow.python.client import device_lib
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' #gets rid of avx/fma warning
 
 # TODO: 
+# Quantization
 # Train models
 # Ensemble
 # MDSR 
@@ -41,6 +42,7 @@ if __name__ == "__main__":
     
     # Set checkpoint paths for different scales and models
     ckpt_path = ""
+
     if scale == 2:
         ckpt_path = "./CKPT_dir/x2/"
     elif scale == 3:

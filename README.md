@@ -11,7 +11,7 @@ It was trained on the [Div2K dataset](https://data.vision.ee.ethz.ch/cvl/DIV2K/)
 
 # Running
 
-Download [Div2K dataset](https://data.vision.ee.ethz.ch/cvl/DIV2K/). If you want to use another dataset, you will have to calculate the mean of that dataset, and change it at main.py and data_utils.make_dataset. Code for calculating the mean can be found in data_utils.py.
+Download [Div2K dataset](https://data.vision.ee.ethz.ch/cvl/DIV2K/). If you want to use another dataset, you will have to calculate the mean of that dataset, and set the new mean in 'main.py'. Code for calculating the mean can be found in data_utils.py.
 
 Train:
 - from scratch

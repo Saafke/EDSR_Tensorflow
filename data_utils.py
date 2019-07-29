@@ -29,17 +29,16 @@ def getpaths(path):
                     im_paths.append(os.path.join(path, fil))
     return im_paths
 
-def make_dataset(paths, scale):
+def make_dataset(paths, scale, mean):
     """
     Python generator-style dataset. Creates 48x48 low-res and corresponding high-res patches.
     """
     size_lr = 48
     size_hr = size_lr * scale
-    meanbgr = [103.1545782, 111.561547, 114.35629928]
     
     for p in paths:
         # normalize 
-        im_norm = cv2.imread(p.decode(), 3).astype(np.float32) - meanbgr
+        im_norm = cv2.imread(p.decode(), 3).astype(np.float32) - mean
         
         # random flip
         r = random.randint(-1, 2)

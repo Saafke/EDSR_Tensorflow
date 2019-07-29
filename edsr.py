@@ -4,7 +4,6 @@ import cv2
 import tensorflow as tf
 import numpy as np
 import os
-import tensorflow.contrib.slim as slim
 
 def model(x, y, B, F, scale, batch, lr):
     """

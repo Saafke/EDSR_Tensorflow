@@ -32,7 +32,7 @@ class run:
         dataset = tf.data.Dataset.from_generator(generator=data_utils.make_dataset, 
                                                  output_types=(tf.float32, tf.float32), 
                                                  output_shapes=(tf.TensorShape([None, None, 3]), tf.TensorShape([None, None, 3])),
-                                                 args=[image_paths, self.scale])
+                                                 args=[image_paths, self.scale, self.mean])
         
         dataset = dataset.padded_batch(self.batch, padded_shapes=([None, None, 3],[None, None, 3]))
         iter = dataset.make_initializable_iterator()
@@ -145,7 +145,7 @@ class run:
 
         with tf.Session(config=self.config) as sess:
             print("\nUpscale image by a factor of {}:\n".format(self.scale))
-            # load the model with tf.data generator
+            # load the model
             ckpt_name = self.ckpt_path + "edsr_ckpt" + ".meta"
             saver = tf.train.import_meta_graph(ckpt_name)
             saver.restore(sess, tf.train.latest_checkpoint(self.ckpt_path))
@@ -189,7 +189,8 @@ class run:
             graph_def = sess.graph
             LR_tensor = graph_def.get_tensor_by_name("IteratorGetNext:0")
             HR_tensor = graph_def.get_tensor_by_name("NHWC_output:0")
-
+            print("Loaded model.")
+            
             output = sess.run(HR_tensor, feed_dict={LR_tensor: LR_input_})
 
             Y = output[0]
@@ -212,6 +213,7 @@ class run:
             cv2.imwrite("./images/input.png", img)
             
             cv2.waitKey(0)
+            cv2.destroyAllWindows()
 
     def export(self):
         print("Exporting model...")
@@ -238,7 +240,7 @@ class run:
 
                 graph_def = TransformGraph(graph_def, ["IteratorGetNext"], ["NCHW_output"], ["sort_by_execution_order"])
 
-                with tf.gfile.FastGFile('frozen_inference_graph_opt.pb', 'wb') as f:
+                with tf.gfile.FastGFile('./models/EDSR_x{}.pb'.format(self.scale), 'wb') as f:
                     f.write(graph_def.SerializeToString())
 
                 tf.train.write_graph(graph_def, ".", 'train.pbtxt')
