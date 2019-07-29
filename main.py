@@ -13,7 +13,7 @@ from tensorflow.python.client import device_lib
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' #gets rid of avx/fma warning
 
 # TODO: 
-# Quantization
+# Quantization - doing it in 'quantization' branch
 # Train models
 # Ensemble
 # MDSR 
