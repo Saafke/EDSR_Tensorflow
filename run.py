@@ -6,6 +6,7 @@ import math
 import data_utils
 from skimage import io
 import edsr
+import mdsr_slim
 from PIL import Image
 
 from tensorflow.python.tools import freeze_graph
@@ -13,10 +14,11 @@ from tensorflow.python.tools import optimize_for_inference_lib
 from tensorflow.tools.graph_transforms import TransformGraph
 
 class run:
-    def __init__(self, config, ckpt_path, scale, batch, epochs, B, F, lr, load_flag, meanBGR):
+    def __init__(self, config, ckpt_path, scale, mdsrFlag, batch, epochs, B, F, lr, load_flag, meanBGR):
         self.config = config
         self.ckpt_path = ckpt_path
         self.scale = scale
+        self.mdsrFlag = mdsrFlag
         self.batch = batch
         self.epochs = epochs
         self.B = B 
@@ -38,7 +40,12 @@ class run:
         iter = dataset.make_initializable_iterator()
         LR, HR = iter.get_next()
         
-        out, loss, train_op, psnr = edsr.model(x=LR, y=HR, B=self.B, F=self.F, scale=self.scale, batch=self.batch, lr=self.lr)
+        if self.mdsrFlag:
+            print("Running MDSR.")
+            out, loss, train_op, psnr = mdsr_slim.model(x=LR, y=HR, B=16, F=64, scale=self.scale, batch=self.batch, lr=self.lr)
+        else: # EDSR
+            print("Running EDSR.")
+            out, loss, train_op, psnr = edsr.model(x=LR, y=HR, B=self.B, F=self.F, scale=self.scale, batch=self.batch, lr=self.lr)
         
         # -- Training session
         with tf.Session(config=self.config) as sess:
