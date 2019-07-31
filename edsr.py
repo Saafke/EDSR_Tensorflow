@@ -6,71 +6,72 @@ import numpy as np
 import os
 
 class Edsr:
-    
-    def __init__(self):
+
+    def __init__(self, B, F, scale):
+        self.B = B
+        self.F = F
+        self.scale = scale
         self.global_step = tf.placeholder(tf.int32, shape=[], name="global_step")
-  
-    def model(self, x, y, B, F, scale, batch, lr):
+        self.scaling_factor = 0.1
+        self.bias_initializer = tf.constant_initializer(value=0.0)
+        self.PS = 3 * (scale*scale) #channels x scale^2
+        self.xavier = tf.contrib.layers.xavier_initializer()
+
+        # -- Filters & Biases --
+        self.resFilters = list()
+        self.resBiases = list()
+
+        for i in range(0, B*2):
+            self.resFilters.append( tf.get_variable("resFilter%d" % (i), shape=[3,3,F,F], initializer=self.xavier))
+            self.resBiases.append(tf.get_variable(name="resBias%d" % (i), shape=[F], initializer=self.bias_initializer))
+
+        self.filter_one = tf.get_variable("resFilter_one", shape=[3,3,3,F], initializer=self.xavier)
+        self.filter_two = tf.get_variable("resFilter_two", shape=[3,3,F,F], initializer=self.xavier)
+        self.filter_three = tf.get_variable("resFilter_three", shape=[3,3,F,self.PS], initializer=self.xavier)
+
+        self.bias_one = tf.get_variable(shape=[F], initializer=self.bias_initializer, name="BiasOne")
+        self.bias_two = tf.get_variable(shape=[F], initializer=self.bias_initializer, name="BiasTwo")
+        self.bias_three = tf.get_variable(shape=[self.PS], initializer=self.bias_initializer, name="BiasThree")
+
+
+    def model(self, x, y, lr):
         """
         Implementation of EDSR: https://arxiv.org/abs/1707.02921.
         """
-        
-        #INIT
-        scaling_factor = 0.1
-        bias_initializer = tf.constant_initializer(value=0.0)
-        PS = 3 * (scale*scale) #channels x scale^2
-        xavier = tf.contrib.layers.xavier_initializer()
-        
-        # -- Filters & Biases --
-        resFilters = list()
-        resBiases = list()
-
-        for i in range(0, B*2):
-            resFilters.append( tf.get_variable("resFilter%d" % (i), shape=[3,3,F,F],
-            initializer=xavier))
-            resBiases.append(tf.get_variable(name="resBias%d" % (i), shape=[F], initializer=bias_initializer ) )
-
-        filter_one = tf.get_variable("resFilter_one", shape=[3,3,3,F], initializer=xavier)
-        filter_two = tf.get_variable("resFilter_two", shape=[3,3,F,F], initializer=xavier)
-        filter_three = tf.get_variable("resFilter_three", shape=[3,3,F,PS], initializer=xavier)
-
-        bias_one = tf.get_variable(shape=[F], initializer=bias_initializer, name="BiasOne")
-        bias_two = tf.get_variable(shape=[F], initializer=bias_initializer, name="BiasTwo")
-        bias_three = tf.get_variable(shape=[PS], initializer=bias_initializer, name="BiasThree")
 
         # -- Model architecture --
-        
+
         # first conv
-        x = tf.nn.conv2d(x, filter=filter_one, strides=[1, 1, 1, 1], padding='SAME')
-        x = x + bias_one
+        x = tf.nn.conv2d(x, filter=self.filter_one, strides=[1, 1, 1, 1], padding='SAME')
+        x = x + self.bias_one
         out1 = tf.identity(x)
 
         # all residual blocks
-        for i in range(B):
-            x = self.resBlock(x, (i*2), scaling_factor, resFilters, resBiases)
+        for i in range(self.B):
+            x = self.resBlock(x, (i*2))
 
         # last conv
-        x = tf.nn.conv2d(x, filter=filter_two, strides=[1, 1, 1, 1], padding='SAME')
-        x = x + bias_two
+        x = tf.nn.conv2d(x, filter=self.filter_two, strides=[1, 1, 1, 1], padding='SAME')
+        x = x + self.bias_two
         x = x + out1
 
 
         # upsample via sub-pixel, equivalent to depth to space
-        x = tf.nn.conv2d(x, filter=filter_three, strides=[1, 1, 1, 1], padding='SAME')
-        x = x + bias_three
-        out = tf.nn.depth_to_space(x, scale, data_format='NHWC', name="NHWC_output")
-        # -- -- 
+        x = tf.nn.conv2d(x, filter=self.filter_three, strides=[1, 1, 1, 1], padding='SAME')
+        x = x + self.bias_three
+        out = tf.nn.depth_to_space(x, self.scale, data_format='NHWC', name="NHWC_output")
+        # -- --
 
-        # some outputs
+        # Some outputs
         out_nchw = tf.transpose(out, [0, 3, 1, 2], name="NCHW_output")
         psnr = tf.image.psnr(out, y, max_val=1.0)
         loss = tf.losses.absolute_difference(out, y) #L1
 
-        # learning rate
+        # (decaying) learning rate
         lr = tf.train.exponential_decay(lr,
-                                        self.global_step, 
+                                        self.global_step,
                                         decay_steps=10000,
-                                        decay_rate=0.95, 
+                                        decay_rate=0.95,
                                         staircase=True)
         # Gradient clipping
         optimizer = tf.train.AdamOptimizer(lr)
@@ -80,13 +81,13 @@ class Edsr:
 
         return out, loss, train_op, psnr, lr
 
-    def resBlock(self, inpt, f_nr, scaling_factor, filters, biases):
-        x = tf.nn.conv2d(inpt, filter=filters[f_nr], strides=[1, 1, 1, 1], padding='SAME')
-        x = x + biases[f_nr]
+    def resBlock(self, inpt, f_nr):
+        x = tf.nn.conv2d(inpt, filter=self.resFilters[f_nr], strides=[1, 1, 1, 1], padding='SAME')
+        x = x + self.resBiases[f_nr]
         x = tf.nn.relu(x)
 
-        x = tf.nn.conv2d(x, filter=filters[f_nr+1], strides=[1, 1, 1, 1], padding='SAME')
-        x = x + biases[f_nr+1]
-        x = x * scaling_factor
+        x = tf.nn.conv2d(x, filter=self.resFilters[f_nr+1], strides=[1, 1, 1, 1], padding='SAME')
+        x = x + self.resBiases[f_nr+1]
+        x = x * self.scaling_factor
 
         return inpt + x

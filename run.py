@@ -19,42 +19,42 @@ class run:
         self.scale = scale
         self.batch = batch
         self.epochs = epochs
-        self.B = B 
+        self.B = B
         self.F = F
         self.lr = lr
         self.load_flag = load_flag
         self.mean = meanBGR
 
     def train(self, imagefolder):
-        
+
         # Create training dataset iterator
         image_paths = data_utils.getpaths(imagefolder)
-        dataset = tf.data.Dataset.from_generator(generator=data_utils.make_dataset, 
-                                                 output_types=(tf.float32, tf.float32), 
+        dataset = tf.data.Dataset.from_generator(generator=data_utils.make_dataset,
+                                                 output_types=(tf.float32, tf.float32),
                                                  output_shapes=(tf.TensorShape([None, None, 3]), tf.TensorShape([None, None, 3])),
                                                  args=[image_paths, self.scale, self.mean])
         
         dataset = dataset.padded_batch(self.batch, padded_shapes=([None, None, 3],[None, None, 3]))
         iter = dataset.make_initializable_iterator()
         LR, HR = iter.get_next()
-        
+
         # Create cache
         if not os.path.exists("./cache"):
             os.makedirs("./cache")
         dataset.cache(filename="./cache")
 
         # Edsr model
-        edsrObj = edsr.Edsr()
-        out, loss, train_op, psnr, lr = edsrObj.model(x=LR, y=HR, B=self.B, F=self.F, scale=self.scale, batch=self.batch, lr=self.lr)
-        
+        edsrObj = edsr.Edsr(self.B, self.F, self.scale)
+        out, loss, train_op, psnr, lr = edsrObj.model(x=LR, y=HR, lr=self.lr)
+
         # -- Training session
         with tf.Session(config=self.config) as sess:
-            
+
             train_writer = tf.summary.FileWriter('./logs/train', sess.graph)
             sess.run(tf.global_variables_initializer())
-            
+
             saver = tf.train.Saver()
-            
+
             # Create check points directory if not existed, and load previous model if specified.
             if not os.path.exists(self.ckpt_path):
                 os.makedirs(self.ckpt_path)
@@ -70,24 +70,28 @@ class run:
 
             global_step = 0
             tf.convert_to_tensor(global_step)
-            
+
+            #find "killed" error
+            tf.get_default_graph().finalize()
+
             print("Training...")
             for e in range(1, self.epochs):
                 sess.run(iter.initializer)
-                step, train_loss, train_psnr = 0, 0, 0 
-    
+                step, train_loss, train_psnr = 0, 0, 0
+
                 while True:
                     try:
                         o, l, t, ps, l_rate = sess.run([out, loss, train_op, psnr, lr], feed_dict={edsrObj.global_step: global_step})
+                        
                         train_loss += l
                         train_psnr += (np.mean(np.asarray(ps)))
                         step += 1
                         global_step += 1
 
                         if step % 1000 == 0:
-                            save_path = saver.save(sess, self.ckpt_path + "edsr_ckpt")  
+                            save_path = saver.save(sess, self.ckpt_path + "edsr_ckpt")
                             print("Step nr: [{}/{}] - Loss: {:.5f} - Lr: {:.7f}".format(step, "?", float(train_loss/step), l_rate))
-                    
+
                     except tf.errors.OutOfRangeError:
                         break
 
@@ -96,7 +100,7 @@ class run:
                                                                                             self.epochs,
                                                                                             float(train_loss/step),
                                                                                             self.validTest()))
-                save_path = saver.save(sess, self.ckpt_path + "edsr_ckpt")   
+                save_path = saver.save(sess, self.ckpt_path + "edsr_ckpt")
 
             print("Training finished.")
             train_writer.close()
@@ -112,7 +116,7 @@ class run:
         im_paths = data_utils.getpaths(imageFolder)
 
         with tf.Session(config=self.config) as sessx:
-            
+
             ckpt_name = self.ckpt_path + "edsr_ckpt" + ".meta"
             saverx = tf.train.import_meta_graph(ckpt_name)
             saverx.restore(sessx, tf.train.latest_checkpoint(self.ckpt_path))
@@ -132,7 +136,7 @@ class run:
                 floatimg = img.astype(np.float32) - self.mean
 
                 inp = floatimg.reshape(1, floatimg.shape[0], floatimg.shape[1], 3)
-                
+
                 output = sessx.run(HR_tensor, feed_dict={LR_tensor: inp})
 
                 Y = output[0]
@@ -176,9 +180,9 @@ class run:
             cv2.imshow('HR image', HR_image)
             cv2.imshow('Bicubic HR image', bicubic_image)
             cv2.waitKey(0)
-        
+
         sess.close()
-    
+
     def test(self, path):
         """
         Test single image and calculate psnr.
@@ -203,7 +207,7 @@ class run:
             LR_tensor = graph_def.get_tensor_by_name("IteratorGetNext:0")
             HR_tensor = graph_def.get_tensor_by_name("NHWC_output:0")
             print("Loaded model.")
-            
+
             output = sess.run(HR_tensor, feed_dict={LR_tensor: LR_input_})
 
             Y = output[0]
@@ -219,17 +223,17 @@ class run:
             cv2.imshow('Original image', fullimg)
             cv2.imshow('HR image', HR_image)
             cv2.imshow('Bicubic HR image', bicubic_image)
-            
+
             cv2.imwrite("./images/edsrOutput.png", HR_image)
             cv2.imwrite("./images/bicubicOutput.png", bicubic_image)
             cv2.imwrite("./images/original.png", fullimg)
             cv2.imwrite("./images/input.png", img)
-            
+
             cv2.waitKey(0)
             cv2.destroyAllWindows()
-        
+
         sess.close()
-    
+
     def load_pb(self, path_to_pb):
         with tf.gfile.GFile(path_to_pb, "rb") as f:
             graph_def = tf.GraphDef()
@@ -237,14 +241,14 @@ class run:
         with tf.Graph().as_default() as graph:
             tf.import_graph_def(graph_def, name='')
             return graph
-    
+
     def testFromPb(self, path):
         # Read model
         pbPath = "./models/EDSRq_x{}.pb".format(self.scale)
-        
+
         # Get graph
         graph = self.load_pb(pbPath)
-        
+
         fullimg = cv2.imread(path, 3)
         width = fullimg.shape[0]
         height = fullimg.shape[1]
@@ -257,7 +261,7 @@ class run:
 
         LR_tensor = graph.get_tensor_by_name("IteratorGetNext:0")
         HR_tensor = graph.get_tensor_by_name("NHWC_output:0")
-        
+
         with tf.Session(graph=graph) as sess:
             print("Loading pb...")
             output = sess.run(HR_tensor, feed_dict={LR_tensor: LR_input_})
@@ -274,31 +278,31 @@ class run:
             cv2.imshow('Original image', fullimg)
             cv2.imshow('HR image', HR_image)
             cv2.imshow('Bicubic HR image', bicubic_image)
-            
+
             cv2.imwrite("./images/edsrOutput.png", HR_image)
             cv2.imwrite("./images/bicubicOutput.png", bicubic_image)
             cv2.imwrite("./images/original.png", fullimg)
             cv2.imwrite("./images/input.png", img)
-            
+
             cv2.waitKey(0)
             cv2.destroyAllWindows()
             print("Done.")
-        
+
         sess.close()
 
     def export(self, quant):
         print("Exporting model...")
-        
+
         export_dir = "./models/x{}/".format(self.scale)
         if not os.path.exists(export_dir):
                 os.makedirs(export_dir)
-        
+
         export_file = "EDSR_x{}.pb".format(self.scale)
 
         graph = tf.get_default_graph()
         with graph.as_default():
             with tf.Session(config=self.config) as sess:
-                
+
                 ### Restore checkpoint
                 ckpt_name = self.ckpt_path + "edsr_ckpt" + ".meta"
                 saver = tf.train.import_meta_graph(ckpt_name)
@@ -309,7 +313,7 @@ class run:
 
                 # All variables to constants
                 graph_def = tf.graph_util.convert_variables_to_constants(sess, graph_def, ['NCHW_output'])
-                
+
                 # Optimize for inference
                 graph_def = optimize_for_inference_lib.optimize_for_inference(graph_def, ["IteratorGetNext"],
                                                                             ["NCHW_output"],  # ["NHWC_output"],
@@ -326,8 +330,8 @@ class run:
                     transforms = ["sort_by_execution_order", "round_weights", "quantize_weights"]
                     export_file = "EDSRq_x{}.pb".format(self.scale)
 
-                graph_def = TransformGraph(graph_def, ["IteratorGetNext"], 
-                                                      ["NCHW_output"], 
+                graph_def = TransformGraph(graph_def, ["IteratorGetNext"],
+                                                      ["NCHW_output"],
                                                       transforms)
                 print("File={}".format(export_dir+export_file))
                 with tf.gfile.GFile(export_dir + export_file, 'wb') as f:
