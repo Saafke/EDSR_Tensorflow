@@ -15,8 +15,9 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' #gets rid of avx/fma warning
 # TODO: 
 # Train models
 # Ensemble
-# MDSR 
+# MDSR - doing it in this branch
 # decaying learning rate
+# make scale dependent data generation
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
