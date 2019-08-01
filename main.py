@@ -37,6 +37,7 @@ if __name__ == "__main__":
     # paths
     parser.add_argument('--image', help='Specify test image', default="./butterfly.png")
     parser.add_argument('--traindir', help='Path to train images', default="/home/weber/Documents/gsoc/datasets/DIV2K_train_HR")
+    parser.add_argument('--validdir', help='Path to train images', default="/home/weber/Documents/gsoc/datasets/Set14")
     args = parser.parse_args()
 
     # INIT
@@ -63,7 +64,7 @@ if __name__ == "__main__":
     run = run.run(config, ckpt_path, scale, args.batch, args.epochs, args.B, args.F, args.lr, args.fromscratch, meanbgr)
 
     if args.train:
-        run.train(args.traindir)
+        run.train(args.traindir, args.validdir)
 
     if args.test:
         run.testFromPb(args.image)

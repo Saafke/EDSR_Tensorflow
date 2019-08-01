@@ -25,27 +25,36 @@ class run:
         self.load_flag = load_flag
         self.mean = meanBGR
 
-    def train(self, imagefolder):
+    def train(self, imagefolder, validfolder):
 
-        # Create training dataset iterator
-        image_paths = data_utils.getpaths(imagefolder)
-        dataset = tf.data.Dataset.from_generator(generator=data_utils.make_dataset,
+        # Create training dataset
+        train_image_paths = data_utils.getpaths(imagefolder)
+        train_dataset = tf.data.Dataset.from_generator(generator=data_utils.make_dataset,
                                                  output_types=(tf.float32, tf.float32),
                                                  output_shapes=(tf.TensorShape([None, None, 3]), tf.TensorShape([None, None, 3])),
-                                                 args=[image_paths, self.scale, self.mean])
+                                                 args=[train_image_paths, self.scale, self.mean])
+        train_dataset = train_dataset.padded_batch(self.batch, padded_shapes=([None, None, 3],[None, None, 3]))
         
-        dataset = dataset.padded_batch(self.batch, padded_shapes=([None, None, 3],[None, None, 3]))
-        iter = dataset.make_initializable_iterator()
-        LR, HR = iter.get_next()
-
-        # Create cache
-        if not os.path.exists("./cache"):
-            os.makedirs("./cache")
-        dataset.cache(filename="./cache")
-
+        # Create validation dataset
+        val_image_paths = data_utils.getpaths(validfolder)
+        val_dataset = tf.data.Dataset.from_generator(generator=data_utils.make_val_dataset,
+                                                 output_types=(tf.float32, tf.float32),
+                                                 output_shapes=(tf.TensorShape([None, None, 3]), tf.TensorShape([None, None, 3])),
+                                                 args=[val_image_paths, self.scale, self.mean])
+        val_dataset = val_dataset.padded_batch(1, padded_shapes=([None, None, 3],[None, None, 3]))
+        
+        # Make the iterator and its initializers
+        train_val_iterator = tf.data.Iterator.from_structure(train_dataset.output_types, train_dataset.output_shapes)
+        train_initializer = train_val_iterator.make_initializer(train_dataset)
+        val_initializer = train_val_iterator.make_initializer(val_dataset)
+        
+        handle = tf.placeholder(tf.string, shape=[])
+        iterator = tf.data.Iterator.from_string_handle(handle, train_dataset.output_types, train_dataset.output_shapes)
+        LR, HR = iterator.get_next()
+        
         # Edsr model
         edsrObj = edsr.Edsr(self.B, self.F, self.scale)
-        out, loss, train_op, psnr, lr = edsrObj.model(x=LR, y=HR, lr=self.lr)
+        out, loss, train_op, psnr, ssim, lr = edsrObj.model(x=LR, y=HR, lr=self.lr)
 
         # -- Training session
         with tf.Session(config=self.config) as sess:
@@ -71,20 +80,19 @@ class run:
             global_step = 0
             tf.convert_to_tensor(global_step)
 
-            #find "killed" error
-            tf.get_default_graph().finalize()
-
+            train_val_handle = sess.run(train_val_iterator.string_handle())
+            
             print("Training...")
             for e in range(1, self.epochs):
-                sess.run(iter.initializer)
-                step, train_loss, train_psnr = 0, 0, 0
-
-                while True:
-                    try:
-                        o, l, t, ps, l_rate = sess.run([out, loss, train_op, psnr, lr], feed_dict={edsrObj.global_step: global_step})
-                        
+                
+                sess.run(train_initializer)
+                step, train_loss = 0, 0
+                
+                try:
+                    while True:
+                        o, l, t, l_rate = sess.run([out, loss, train_op, lr], feed_dict={handle:train_val_handle, 
+                                                                                         edsrObj.global_step: global_step})
                         train_loss += l
-                        train_psnr += (np.mean(np.asarray(ps)))
                         step += 1
                         global_step += 1
 
@@ -92,61 +100,32 @@ class run:
                             save_path = saver.save(sess, self.ckpt_path + "edsr_ckpt")
                             print("Step nr: [{}/{}] - Loss: {:.5f} - Lr: {:.7f}".format(step, "?", float(train_loss/step), l_rate))
 
-                    except tf.errors.OutOfRangeError:
-                        break
+                except tf.errors.OutOfRangeError:
+                    pass
 
                 # Perform end-of-epoch calculations here.
-                print("Epoch nr: [{}/{}]  - Loss: {:.5f} - Valid set PSNR: {:.3f}\n".format(e,
-                                                                                            self.epochs,
-                                                                                            float(train_loss/step),
-                                                                                            self.validTest()))
+                sess.run(val_initializer)
+                tot_val_psnr, tot_val_ssim, val_im_cntr = 0, 0, 0
+                try:
+                    while True:
+                        val_psnr, val_ssim = sess.run([psnr, ssim], feed_dict={handle:train_val_handle})
+
+                        tot_val_psnr += val_psnr[0]
+                        tot_val_ssim += val_ssim[0]
+                        val_im_cntr += 1
+
+                except tf.errors.OutOfRangeError:
+                    pass
+                 
+                print("Epoch nr: [{}/{}]  - Loss: {:.5f} - val PSNR: {:.3f} - val SSIM: {:.3f}\n".format(e,
+                                                                                                         self.epochs,
+                                                                                                         float(train_loss/step),
+                                                                                                         (tot_val_psnr / val_im_cntr),
+                                                                                                         (tot_val_ssim / val_im_cntr)))
                 save_path = saver.save(sess, self.ckpt_path + "edsr_ckpt")
 
             print("Training finished.")
             train_writer.close()
-
-    def validTest(self):
-        """
-        Tests model on a validation set.
-        """
-        inputs = list()
-        tot_psnr = 0
-        im_cnt = 0
-        imageFolder = "/home/weber/Documents/gsoc/datasets/Set14"
-        im_paths = data_utils.getpaths(imageFolder)
-
-        with tf.Session(config=self.config) as sessx:
-
-            ckpt_name = self.ckpt_path + "edsr_ckpt" + ".meta"
-            saverx = tf.train.import_meta_graph(ckpt_name)
-            saverx.restore(sessx, tf.train.latest_checkpoint(self.ckpt_path))
-            graph_def = sessx.graph
-            LR_tensor = graph_def.get_tensor_by_name("IteratorGetNext:0")
-            HR_tensor = graph_def.get_tensor_by_name("NHWC_output:0")
-
-            # prepare image, upscale and calc psnr
-            for p in im_paths:
-
-                fullimg = cv2.imread(p, 3)
-                width = fullimg.shape[0]
-                height = fullimg.shape[1]
-
-                cropped = fullimg[0:(width - (width % self.scale)), 0:(height - (height % self.scale)), :]
-                img = cv2.resize(cropped, None, fx=1. / self.scale, fy=1. / self.scale, interpolation=cv2.INTER_CUBIC)
-                floatimg = img.astype(np.float32) - self.mean
-
-                inp = floatimg.reshape(1, floatimg.shape[0], floatimg.shape[1], 3)
-
-                output = sessx.run(HR_tensor, feed_dict={LR_tensor: inp})
-
-                Y = output[0]
-                HR_image = (Y + self.mean).clip(min=0, max=255)
-                HR_image = (HR_image).astype(np.uint8)
-
-                tot_psnr += self.psnr(cropped, HR_image)
-                im_cnt += 1
-        sessx.close()
-        return tot_psnr / im_cnt
 
     def upscale(self, path):
         """

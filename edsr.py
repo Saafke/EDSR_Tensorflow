@@ -55,31 +55,32 @@ class Edsr:
         x = x + self.bias_two
         x = x + out1
 
-
         # upsample via sub-pixel, equivalent to depth to space
         x = tf.nn.conv2d(x, filter=self.filter_three, strides=[1, 1, 1, 1], padding='SAME')
         x = x + self.bias_three
         out = tf.nn.depth_to_space(x, self.scale, data_format='NHWC', name="NHWC_output")
+        
         # -- --
 
-        # Some outputs
+        # some outputs
         out_nchw = tf.transpose(out, [0, 3, 1, 2], name="NCHW_output")
-        psnr = tf.image.psnr(out, y, max_val=1.0)
+        psnr = tf.image.psnr(out, y, max_val=255.0)
         loss = tf.losses.absolute_difference(out, y) #L1
-
+        ssim = tf.image.ssim(out, y, max_val=255.0)
+        
         # (decaying) learning rate
         lr = tf.train.exponential_decay(lr,
                                         self.global_step,
-                                        decay_steps=10000,
+                                        decay_steps=15000,
                                         decay_rate=0.95,
                                         staircase=True)
-        # Gradient clipping
+        # gradient clipping
         optimizer = tf.train.AdamOptimizer(lr)
         gradients, variables = zip(*optimizer.compute_gradients(loss))
         gradients, _ = tf.clip_by_global_norm(gradients, 5.0)
         train_op = optimizer.apply_gradients(zip(gradients, variables))
 
-        return out, loss, train_op, psnr, lr
+        return out, loss, train_op, psnr, ssim, lr
 
     def resBlock(self, inpt, f_nr):
         x = tf.nn.conv2d(inpt, filter=self.resFilters[f_nr], strides=[1, 1, 1, 1], padding='SAME')
