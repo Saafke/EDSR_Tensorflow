@@ -95,11 +95,18 @@ class run:
 
             print("Training...")
             for e in range(1, self.epochs):
-                sess.run(iter.initializer)
+                
+                sess.run(train_initializer)
+                
                 step, train_loss, train_psnr = 0, 0, 0 
     
                 while True:
                     try:
+                        # random scale
+                        r_scale = random.randint(2, 4)
+                        if r_scale == 2:
+                            sess.run()
+                        o, l, t = sess.run([out, loss, train_op], feed_dict={handle:train_handle})
                         o, l, t, ps = sess.run([out, loss, train_op, psnr])
                         train_loss += l
                         train_psnr += (np.mean(np.asarray(ps)))
