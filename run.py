@@ -59,8 +59,9 @@ class run:
         x3_initializer = train_iterator.make_initializer(x3_dataset)
         x4_initializer = train_iterator.make_initializer(x4_dataset)
         
-        iter = dataset.make_initializable_iterator()
-        LR, HR = iter.get_next()
+        handle = tf.placeholder(tf.string, shape=[])
+        iterator = tf.data.Iterator.from_string_handle(handle, train_dataset.output_types, train_dataset.output_shapes)
+        LR, HR = iterator.get_next()
         
         if self.mdsrFlag:
             print("Running MDSR.")
