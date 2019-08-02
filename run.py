@@ -31,12 +31,34 @@ class run:
         
         # Create training dataset iterator
         image_paths = data_utils.getpaths(imagefolder)
-        dataset = tf.data.Dataset.from_generator(generator=data_utils.make_dataset, 
+        #x2
+        x2_dataset = tf.data.Dataset.from_generator(generator=data_utils.make_dataset, 
                                                  output_types=(tf.float32, tf.float32), 
                                                  output_shapes=(tf.TensorShape([None, None, 3]), tf.TensorShape([None, None, 3])),
-                                                 args=[image_paths, self.scale, self.mean])
+                                                 args=[image_paths, 2, self.mean])
+        x2_dataset = x2_dataset.padded_batch(self.batch, padded_shapes=([None, None, 3],[None, None, 3]))
         
-        dataset = dataset.padded_batch(self.batch, padded_shapes=([None, None, 3],[None, None, 3]))
+        #x3
+        x3_dataset = tf.data.Dataset.from_generator(generator=data_utils.make_dataset, 
+                                                 output_types=(tf.float32, tf.float32), 
+                                                 output_shapes=(tf.TensorShape([None, None, 3]), tf.TensorShape([None, None, 3])),
+                                                 args=[image_paths, 3, self.mean])
+        x3_dataset = x3_dataset.padded_batch(self.batch, padded_shapes=([None, None, 3],[None, None, 3]))
+
+        #x4
+        x4_dataset = tf.data.Dataset.from_generator(generator=data_utils.make_dataset, 
+                                                 output_types=(tf.float32, tf.float32), 
+                                                 output_shapes=(tf.TensorShape([None, None, 3]), tf.TensorShape([None, None, 3])),
+                                                 args=[image_paths, 4, self.mean])
+        x4_dataset = x4_dataset.padded_batch(self.batch, padded_shapes=([None, None, 3],[None, None, 3]))
+        
+
+        train_iterator = tf.data.Iterator.from_structure(train_dataset.output_types, train_dataset.output_shapes)
+        
+        x2_initializer = train_iterator.make_initializer(x2_dataset)
+        x3_initializer = train_iterator.make_initializer(x3_dataset)
+        x4_initializer = train_iterator.make_initializer(x4_dataset)
+        
         iter = dataset.make_initializable_iterator()
         LR, HR = iter.get_next()
         
