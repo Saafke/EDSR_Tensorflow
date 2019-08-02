@@ -4,6 +4,7 @@ import cv2
 import numpy as np
 import math
 import data_utils
+import random
 from skimage import io
 import edsr
 import mdsr_slim
@@ -14,11 +15,10 @@ from tensorflow.python.tools import optimize_for_inference_lib
 from tensorflow.tools.graph_transforms import TransformGraph
 
 class run:
-    def __init__(self, config, ckpt_path, scale, mdsrFlag, batch, epochs, B, F, lr, load_flag, meanBGR):
+    def __init__(self, config, ckpt_path, scale, batch, epochs, B, F, lr, load_flag, meanBGR):
         self.config = config
         self.ckpt_path = ckpt_path
         self.scale = scale
-        self.mdsrFlag = mdsrFlag
         self.batch = batch
         self.epochs = epochs
         self.B = B 
@@ -63,13 +63,13 @@ class run:
         iterator = tf.data.Iterator.from_string_handle(handle, x2_dataset.output_types, x2_dataset.output_shapes)
         LR, HR = iterator.get_next()
         
-        if self.mdsrFlag:
-            print("Running MDSR.")
-            out, loss, train_op, psnr = mdsr_slim.model(x=LR, y=HR, B=16, F=64, scale=self.scale, batch=self.batch, lr=self.lr)
-        else: # EDSR
-            print("Running EDSR.")
-            out, loss, train_op, psnr = edsr.model(x=LR, y=HR, B=self.B, F=self.F, scale=self.scale, batch=self.batch, lr=self.lr)
-        
+        # scale placeholder because we will change a lot.
+        scale_placeholder = tf.placeholder(tf.uint8, shape=[])
+
+        print("Running MDSR.")
+        mdsrObj = mdsr_slim.Mdsr(self.B, self.F, self.scale)
+        out, loss, train_op, psnr, lr = mdsrObj.model(x=LR, y=HR, lr=self.lr)
+
         # -- Training session
         with tf.Session(config=self.config) as sess:
             
@@ -82,7 +82,7 @@ class run:
             if not os.path.exists(self.ckpt_path):
                 os.makedirs(self.ckpt_path)
             else:
-                if os.path.isfile(self.ckpt_path + "edsr_ckpt" + ".meta"):
+                if os.path.isfile(self.ckpt_path + "mdsr_ckpt" + ".meta"):
                     if self.load_flag:
                         saver.restore(sess, tf.train.latest_checkpoint(self.ckpt_path))
                         print("\nLoaded checkpoint.")
@@ -90,31 +90,37 @@ class run:
                         print("No checkpoint loaded. Training from scratch.")
                 else:
                     print("Previous checkpoint does not exists.")
-
+            
+            global_step = 0
+            tf.convert_to_tensor(global_step)
+            
             train_handle = sess.run(train_iterator.string_handle())
 
             print("Training...")
             for e in range(1, self.epochs):
                 
-                sess.run(train_initializer)
-                
                 step, train_loss, train_psnr = 0, 0, 0 
     
                 while True:
                     try:
-                        # random scale
+                        # get batch of random scale
                         r_scale = random.randint(2, 4)
                         if r_scale == 2:
-                            sess.run()
-                        o, l, t = sess.run([out, loss, train_op], feed_dict={handle:train_handle})
-                        o, l, t, ps = sess.run([out, loss, train_op, psnr])
-                        train_loss += l
-                        train_psnr += (np.mean(np.asarray(ps)))
-                        step += 1
+                            sess.run(x2_initializer)
+                        elif r_scale == 3:
+                            sess.run(x3_initializer)
+                        else:
+                            sess.run(x4_initializer)
                         
+                        o, l, t, l_rate = sess.run([out, loss, train_op, lr], feed_dict={handle:train_handle, 
+                                                                             mdsrObj.scale: r_scale,
+                                                                             mdsrObj.global_step: global_step})
+                        train_loss += l
+                        step += 1
+                        global_step += 1
                         if step % 1000 == 0:
-                            save_path = saver.save(sess, self.ckpt_path + "edsr_ckpt")  
-                            print("Step nr: [{}/{}] - Loss: {:.5f}".format(step, "?", float(train_loss/step)))
+                            save_path = saver.save(sess, self.ckpt_path + "mdsr_ckpt")  
+                            print("Step nr: [{}/{}] - Loss: {:.5f} - LR: {:5f}".format(step, "?", float(train_loss/step), l_rate))
                     
                     except tf.errors.OutOfRangeError:
                         break
@@ -124,7 +130,7 @@ class run:
                                                                                             self.epochs,
                                                                                             float(train_loss/step),
                                                                                             self.validTest()))
-                save_path = saver.save(sess, self.ckpt_path + "edsr_ckpt")   
+                save_path = saver.save(sess, self.ckpt_path + "mdsr_ckpt")   
 
             print("Training finished.")
             train_writer.close()
@@ -141,7 +147,7 @@ class run:
 
         with tf.Session(config=self.config) as sessx:
             
-            ckpt_name = self.ckpt_path + "edsr_ckpt" + ".meta"
+            ckpt_name = self.ckpt_path + "mdsr_ckpt" + ".meta"
             saverx = tf.train.import_meta_graph(ckpt_name)
             saverx.restore(sessx, tf.train.latest_checkpoint(self.ckpt_path))
             graph_def = sessx.graph
@@ -185,7 +191,7 @@ class run:
         with tf.Session(config=self.config) as sess:
             print("\nUpscale image by a factor of {}:\n".format(self.scale))
             # load the model
-            ckpt_name = self.ckpt_path + "edsr_ckpt" + ".meta"
+            ckpt_name = self.ckpt_path + "mdsr_ckpt" + ".meta"
             saver = tf.train.import_meta_graph(ckpt_name)
             saver.restore(sess, tf.train.latest_checkpoint(self.ckpt_path))
             graph_def = sess.graph
@@ -222,7 +228,7 @@ class run:
         with tf.Session(config=self.config) as sess:
             print("\nTest model with psnr:\n")
             # load the model
-            ckpt_name = self.ckpt_path + "edsr_ckpt" + ".meta"
+            ckpt_name = self.ckpt_path + "mdsr_ckpt" + ".meta"
             saver = tf.train.import_meta_graph(ckpt_name)
             saver.restore(sess, tf.train.latest_checkpoint(self.ckpt_path))
             graph_def = sess.graph
@@ -239,14 +245,14 @@ class run:
             bicubic_image = cv2.resize(img, None, fx=self.scale, fy=self.scale, interpolation=cv2.INTER_CUBIC)
 
             print(np.amax(Y), np.amax(LR_input_))
-            print("PSNR of  EDSR   upscaled image: {}".format(self.psnr(cropped, HR_image)))
+            print("PSNR of  MDSR   upscaled image: {}".format(self.psnr(cropped, HR_image)))
             print("PSNR of bicubic upscaled image: {}".format(self.psnr(cropped, bicubic_image)))
 
             cv2.imshow('Original image', fullimg)
             cv2.imshow('HR image', HR_image)
             cv2.imshow('Bicubic HR image', bicubic_image)
             
-            cv2.imwrite("./images/edsrOutput.png", HR_image)
+            cv2.imwrite("./images/mdsrOutput.png", HR_image)
             cv2.imwrite("./images/bicubicOutput.png", bicubic_image)
             cv2.imwrite("./images/original.png", fullimg)
             cv2.imwrite("./images/input.png", img)
@@ -262,7 +268,7 @@ class run:
             with tf.Session(config=self.config) as sess:
                 
                 ### Restore checkpoint
-                ckpt_name = self.ckpt_path + "edsr_ckpt" + ".meta"
+                ckpt_name = self.ckpt_path + "mdsr_ckpt" + ".meta"
                 saver = tf.train.import_meta_graph(ckpt_name)
                 saver.restore(sess, tf.train.latest_checkpoint(self.ckpt_path))
 
@@ -279,7 +285,7 @@ class run:
 
                 graph_def = TransformGraph(graph_def, ["IteratorGetNext"], ["NCHW_output"], ["sort_by_execution_order"])
 
-                with tf.gfile.FastGFile('./models/EDSR_x{}.pb'.format(self.scale), 'wb') as f:
+                with tf.gfile.FastGFile('./models/MDSR_x{}.pb'.format(self.scale), 'wb') as f:
                     f.write(graph_def.SerializeToString())
 
                 tf.train.write_graph(graph_def, ".", 'train.pbtxt')

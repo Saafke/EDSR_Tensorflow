@@ -25,14 +25,15 @@ if __name__ == "__main__":
     parser.add_argument('--test', help='Run tests on the model', action="store_true")
     parser.add_argument('--export', help='Export the model as .pb', action="store_true")
     parser.add_argument('--fromscratch', help='Load previous model for training',action="store_false")
-    parser.add_argument('--mdsr', help='Select the MDSR model.',action="store_true")
-    parser.add_argument('--B', type=int, help='Number of resBlocks', default=32)
-    parser.add_argument('--F', type=int, help='Number of filters', default=256)
+    
+    parser.add_argument('--B', type=int, help='Number of resBlocks', default=80)
+    parser.add_argument('--F', type=int, help='Number of filters', default=64)
     parser.add_argument('--scale', type=int, help='Scaling factor of the model', default=2)
     parser.add_argument('--batch', type=int, help='Batch size of the training', default=1)
     parser.add_argument('--epochs', type=int, help='Number of epochs during training', default=20)
-    parser.add_argument('--image', help='Specify test image', default="./butterfly.png")
     parser.add_argument('--lr', type=float, help='Learning_rate', default=0.0001)
+    
+    parser.add_argument('--image', help='Specify test image', default="./butterfly.png")    
     parser.add_argument('--traindir', help='Path to train images', default="/home/weber/Documents/gsoc/datasets/DIV2K_train_HR")
 
     args = parser.parse_args()
@@ -42,26 +43,14 @@ if __name__ == "__main__":
     meanbgr = [103.1545782, 111.561547, 114.35629928]
     
     # Set checkpoint paths for different scales and models
-    ckpt_path = ""
-    if args.mdsr:
-        ckpt_path = "./CKPT_dir/MDSR/"
-    else:
-        if scale == 2:
-            ckpt_path = "./CKPT_dir/x2/"
-        elif scale == 3:
-            ckpt_path = "./CKPT_dir/x3/"
-        elif scale == 4:
-            ckpt_path = "./CKPT_dir/x4/"
-        else:
-            print("No checkpoint directory. Choose scale 2, 3 or 4. Or add checkpoint directory for this scale.")
-            exit()
-    
+    ckpt_path = "./CKPT_dir/"
+ 
     # Set gpu 
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
 
     # Create run instance
-    run = run.run(config, ckpt_path, scale, args.mdsr, args.batch, args.epochs, args.B, args.F, args.lr, args.fromscratch, meanbgr)
+    run = run.run(config, ckpt_path, scale, args.batch, args.epochs, args.B, args.F, args.lr, args.fromscratch, meanbgr)
 
     if args.train:
         run.train(args.traindir)
