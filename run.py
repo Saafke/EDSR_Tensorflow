@@ -29,7 +29,7 @@ class run:
     
     def train(self, imagefolder):
         
-        # Create training dataset iterator
+        # Create training datasets
         image_paths = data_utils.getpaths(imagefolder)
         #x2
         x2_dataset = tf.data.Dataset.from_generator(generator=data_utils.make_dataset, 
@@ -52,15 +52,15 @@ class run:
                                                  args=[image_paths, 4, self.mean])
         x4_dataset = x4_dataset.padded_batch(self.batch, padded_shapes=([None, None, 3],[None, None, 3]))
         
-
-        train_iterator = tf.data.Iterator.from_structure(train_dataset.output_types, train_dataset.output_shapes)
-        
+        # Create iterator and initializers
+        train_iterator = tf.data.Iterator.from_structure(x2_dataset.output_types, x2_dataset.output_shapes)
         x2_initializer = train_iterator.make_initializer(x2_dataset)
         x3_initializer = train_iterator.make_initializer(x3_dataset)
         x4_initializer = train_iterator.make_initializer(x4_dataset)
         
+        # handle
         handle = tf.placeholder(tf.string, shape=[])
-        iterator = tf.data.Iterator.from_string_handle(handle, train_dataset.output_types, train_dataset.output_shapes)
+        iterator = tf.data.Iterator.from_string_handle(handle, x2_dataset.output_types, x2_dataset.output_shapes)
         LR, HR = iterator.get_next()
         
         if self.mdsrFlag:
@@ -90,6 +90,8 @@ class run:
                         print("No checkpoint loaded. Training from scratch.")
                 else:
                     print("Previous checkpoint does not exists.")
+
+            train_handle = sess.run(train_iterator.string_handle())
 
             print("Training...")
             for e in range(1, self.epochs):
