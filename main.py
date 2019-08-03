@@ -30,8 +30,8 @@ if __name__ == "__main__":
     parser.add_argument('--lr', type=float, help='Learning_rate', default=0.0001)
     
     parser.add_argument('--image', help='Specify test image', default="./images/original.png")    
-    parser.add_argument('--traindir', help='Path to train images')
-    parser.add_argument('--validdir', help='Path to validation images')
+    parser.add_argument('--traindir', help='Path to train images', default="/home/weber/Documents/gsoc/datasets/DIV2K_train_HR")
+    parser.add_argument('--validdir', help='Path to validation images', default="/home/weber/Documents/gsoc/datasets/Set14")
 
     args = parser.parse_args()
 
