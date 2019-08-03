@@ -8,7 +8,7 @@ import tensorflow.contrib.slim as slim
 
 class Mdsr:
     
-    def __init__(self, B, F, scale):
+    def __init__(self, B, F):
         self.B = B
         self.F = F
         self.scale = tf.placeholder(tf.uint8, shape=[], name="current_scale")
@@ -49,6 +49,7 @@ class Mdsr:
         out = tf.case({tf.math.equal(self.scale,2): lambda: self.upsampleBlock(x, (2*2)*3, 2, "_x2"), 
                     tf.math.equal(self.scale,3): lambda: self.upsampleBlock(x, (3*3)*3, 3, "_x3")},
                                     default=lambda: self.upsampleBlock(x, (4*4)*3, 4, "_x4"), exclusive=True)
+        out = tf.identity(out, "NHWC_output")
         
         #out = tf.Print(out, [tf.shape(out)[0], tf.shape(out)[1], tf.shape(out)[2], tf.shape(out)[3]], message="LOL:")
         
@@ -56,7 +57,7 @@ class Mdsr:
 
         # some outputs
         out_nchw = tf.transpose(out, [0, 3, 1, 2], name="NCHW_output")
-        psnr = tf.image.psnr(out, y, max_val=1.0)
+        psnr = tf.image.psnr(out, y, max_val=255.0)
         loss = tf.losses.absolute_difference(out, y) #L1
 
         # Learning rate

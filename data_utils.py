@@ -29,6 +29,22 @@ def getpaths(path):
                     im_paths.append(os.path.join(path, fil))
     return im_paths
 
+def make_val_dataset(paths, scale, mean):
+    """
+    Python generator-style dataset for the validation set. Creates input and ground truth.
+    """
+    for p in paths:
+        # normalize
+        im_norm = cv2.imread(p.decode(), 3).astype(np.float32) - mean
+
+        # divisible by scale - create low-res
+        hr = im_norm[0:(im_norm.shape[0] - (im_norm.shape[0] % scale)),
+                  0:(im_norm.shape[1] - (im_norm.shape[1] % scale)), :]
+        lr = cv2.resize(hr, (int(hr.shape[1] / scale), int(hr.shape[0] / scale)),
+                        interpolation=cv2.INTER_CUBIC)
+
+        yield lr, hr
+
 def make_dataset(paths, scale, mean):
     """
     Python generator-style dataset. Creates 48x48 low-res and corresponding high-res patches.
