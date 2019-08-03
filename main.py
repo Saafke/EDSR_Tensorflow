@@ -20,7 +20,7 @@ if __name__ == "__main__":
     parser.add_argument('--test', help='Run tests on the model', action="store_true")
     parser.add_argument('--export', help='Export the model as .pb', action="store_true")
     parser.add_argument('--fromscratch', help='Load previous model for training',action="store_false")
-    parser.add_argument('--quant', help='Quantize weights of model',action="store_true")
+    parser.add_argument('--quant', help='Quantize weights of model for exporting',action="store_true")
     
     parser.add_argument('--B', type=int, help='Number of resBlocks', default=80)
     parser.add_argument('--F', type=int, help='Number of filters', default=64)
@@ -29,9 +29,9 @@ if __name__ == "__main__":
     parser.add_argument('--epochs', type=int, help='Number of epochs during training', default=20)
     parser.add_argument('--lr', type=float, help='Learning_rate', default=0.0001)
     
-    parser.add_argument('--image', help='Specify test image', default="./butterfly.png")    
-    parser.add_argument('--traindir', help='Path to train images', default="/home/weber/Documents/gsoc/datasets/DIV2K_train_HR")
-    parser.add_argument('--validdir', help='Path to train images', default="/home/weber/Documents/gsoc/datasets/Set14")
+    parser.add_argument('--image', help='Specify test image', default="./images/original.png")    
+    parser.add_argument('--traindir', help='Path to train images')
+    parser.add_argument('--validdir', help='Path to validation images')
 
     args = parser.parse_args()
 

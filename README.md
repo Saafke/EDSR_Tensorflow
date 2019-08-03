@@ -11,6 +11,7 @@ This is the MDSR model. It was trained on the [Div2K dataset](https://data.visio
 
 ## MDSR variation
 This branch contains the MDSR model. This single model can upscale x2, x3 and x4, because of different modules per scale, as shown in the image below.
+
 ![Alt text](images/MDSR.png?raw=true "MDSR architecture.")
 
 # Running
