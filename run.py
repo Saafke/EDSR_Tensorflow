@@ -34,7 +34,7 @@ class run:
                                                  output_shapes=(tf.TensorShape([None, None, 3]), tf.TensorShape([None, None, 3])),
                                                  args=[train_image_paths, self.scale, self.mean])
         train_dataset = train_dataset.padded_batch(self.batch, padded_shapes=([None, None, 3],[None, None, 3]))
-        
+
         # Create validation dataset
         val_image_paths = data_utils.getpaths(validfolder)
         val_dataset = tf.data.Dataset.from_generator(generator=data_utils.make_val_dataset,
@@ -42,17 +42,18 @@ class run:
                                                  output_shapes=(tf.TensorShape([None, None, 3]), tf.TensorShape([None, None, 3])),
                                                  args=[val_image_paths, self.scale, self.mean])
         val_dataset = val_dataset.padded_batch(1, padded_shapes=([None, None, 3],[None, None, 3]))
-        
+
         # Make the iterator and its initializers
         train_val_iterator = tf.data.Iterator.from_structure(train_dataset.output_types, train_dataset.output_shapes)
         train_initializer = train_val_iterator.make_initializer(train_dataset)
         val_initializer = train_val_iterator.make_initializer(val_dataset)
-        
+
         handle = tf.placeholder(tf.string, shape=[])
         iterator = tf.data.Iterator.from_string_handle(handle, train_dataset.output_types, train_dataset.output_shapes)
         LR, HR = iterator.get_next()
-        
+
         # Edsr model
+        print("Running EDSR.")
         edsrObj = edsr.Edsr(self.B, self.F, self.scale)
         out, loss, train_op, psnr, ssim, lr = edsrObj.model(x=LR, y=HR, lr=self.lr)
 
@@ -74,23 +75,27 @@ class run:
                         print("\nLoaded checkpoint.")
                     if not self.load_flag:
                         print("No checkpoint loaded. Training from scratch.")
-                else:
-                    print("Previous checkpoint does not exists.")
+                # else:
+                #     if os.path.isfile("./CKPT_dir/x2/" + "edsr_ckpt" + ".meta"):
+                #         saver.restore(sess, tf.train.latest_checkpoint("./CKPT_dir/x2/"))
+                #         print("Previous checkpoint does not exists. Will load model from x2")
+                #     else:
+                #         print("No checkpoint loaded. Training from scratch.")
 
             global_step = 0
             tf.convert_to_tensor(global_step)
 
             train_val_handle = sess.run(train_val_iterator.string_handle())
-            
+
             print("Training...")
             for e in range(1, self.epochs):
-                
+
                 sess.run(train_initializer)
                 step, train_loss = 0, 0
-                
+
                 try:
                     while True:
-                        o, l, t, l_rate = sess.run([out, loss, train_op, lr], feed_dict={handle:train_val_handle, 
+                        o, l, t, l_rate = sess.run([out, loss, train_op, lr], feed_dict={handle:train_val_handle,
                                                                                          edsrObj.global_step: global_step})
                         train_loss += l
                         step += 1
@@ -116,7 +121,7 @@ class run:
 
                 except tf.errors.OutOfRangeError:
                     pass
-                 
+
                 print("Epoch nr: [{}/{}]  - Loss: {:.5f} - val PSNR: {:.3f} - val SSIM: {:.3f}\n".format(e,
                                                                                                          self.epochs,
                                                                                                          float(train_loss/step),

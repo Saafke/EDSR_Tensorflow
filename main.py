@@ -14,8 +14,6 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' #gets rid of avx/fma warning
 
 # TODO:
 # Train models
-# Ensemble
-# MDSR
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -31,7 +29,7 @@ if __name__ == "__main__":
     parser.add_argument('--F', type=int, help='Number of filters', default=256)
     parser.add_argument('--scale', type=int, help='Scaling factor of the model', default=2)
     parser.add_argument('--batch', type=int, help='Batch size of the training', default=16)
-    parser.add_argument('--epochs', type=int, help='Number of epochs during training', default=10)
+    parser.add_argument('--epochs', type=int, help='Number of epochs during training', default=20)
     parser.add_argument('--lr', type=float, help='Learning_rate', default=0.0001)
 
     # paths
