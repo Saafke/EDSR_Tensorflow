@@ -208,8 +208,8 @@ class run:
             cv2.imshow('HR image', HR_image)
             cv2.imshow('Bicubic HR image', bicubic_image)
 
-            cv2.imwrite("./images/edsrOutput.png", HR_image)
-            cv2.imwrite("./images/bicubicOutput.png", bicubic_image)
+            cv2.imwrite("./images/EdsrOutput.png", HR_image)
+            cv2.imwrite("./images/BicubicOutput.png", bicubic_image)
             cv2.imwrite("./images/original.png", fullimg)
             cv2.imwrite("./images/input.png", img)
 

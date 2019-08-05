@@ -33,7 +33,7 @@ if __name__ == "__main__":
     parser.add_argument('--lr', type=float, help='Learning_rate', default=0.0001)
 
     # paths
-    parser.add_argument('--image', help='Specify test image', default="./butterfly.png")
+    parser.add_argument('--image', help='Specify test image', default="./images/original.png")
     parser.add_argument('--traindir', help='Path to train images', default="/home/weber/Documents/gsoc/datasets/DIV2K_train_HR")
     parser.add_argument('--validdir', help='Path to train images', default="/home/weber/Documents/gsoc/datasets/Set14")
     args = parser.parse_args()
@@ -65,7 +65,7 @@ if __name__ == "__main__":
         run.train(args.traindir, args.validdir)
 
     if args.test:
-        run.testFromPb(args.image)
+        #run.testFromPb(args.image)
         run.test(args.image)
         #run.upscale(args.image)
 

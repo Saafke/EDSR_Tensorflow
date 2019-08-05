@@ -1,8 +1,11 @@
-# EDSR_Tensorflow
+# EDSR in Tensorflow
 
 TensorFlow implementation of [Enhanced Deep Residual Networks for Single Image Super-Resolution](https://arxiv.org/pdf/1707.02921.pdf)[1].
 
 It was trained on the [Div2K dataset](https://data.vision.ee.ethz.ch/cvl/DIV2K/) - Train Data (HR images).
+
+## Google Summer of Code with OpenCV
+This repository was made during the 2019 GSoC program for the organization OpenCV. The [trained models (.pb files)](https://github.com/Saafke/EDSR_Tensorflow/tree/master/models/) can easily be used for inference in OpenCV with the 'dnn_superres' module. See the OpenCV documentation for how to do this.
 
 ## Requirements
 - tensorflow
@@ -40,8 +43,8 @@ Extra arguments (Nr of resblocks, filters, batch, lr etc.)
 (4) EDSR scaled (3x) image\
 ![Alt text](images/original.png?raw=true "Original picture")
 ![Alt text](images/input.png?raw=true "Input image picture")
-![Alt text](images/bicubicOutput.png?raw=true "Bicubic picture")
-![Alt text](images/edsrOutput.png?raw=true "EDSR picture")
+![Alt text](images/BicubicOutput.png?raw=true "Bicubic picture")
+![Alt text](images/EdsrOutput.png?raw=true "EDSR picture")
 
 
 ## References
