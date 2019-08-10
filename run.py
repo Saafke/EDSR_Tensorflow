@@ -279,13 +279,14 @@ class run:
             cv2.imshow('MDSR HR image', HR_image)
             cv2.imshow('Bicubic HR image', bicubic_image)
             
-            cv2.imwrite("./images/mdsrOutput.png", HR_image)
-            cv2.imwrite("./images/bicubicOutput.png", bicubic_image)
+            cv2.imwrite("./images/MdsrOutput.png", HR_image)
+            cv2.imwrite("./images/BicubicOutput.png", bicubic_image)
             cv2.imwrite("./images/original.png", fullimg)
             cv2.imwrite("./images/input.png", img)
             
             cv2.waitKey(0)
             cv2.destroyAllWindows()
+        sess.close()
 
     def export(self, quant):
         print("Exporting model...")

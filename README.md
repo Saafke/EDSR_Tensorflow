@@ -41,8 +41,8 @@ Extra arguments (Nr of resblocks, filters, batch, lr etc.)
 (4) MDSR scaled (3x) image\
 ![Alt text](images/original.png?raw=true "Original picture")
 ![Alt text](images/input.png?raw=true "Input image picture")
-![Alt text](images/bicubicOutput.png?raw=true "Bicubic picture")
-![Alt text](images/edsrOutput.png?raw=true "EDSR picture")
+![Alt text](images/BicubicOutput.png?raw=true "Bicubic picture")
+![Alt text](images/MdsrOutput.png?raw=true "MDSR picture")
 
 ## Notes
 MDSRq.pb denotes a quantized version (mainly to shrink filesize), and has slightly worse performance.
