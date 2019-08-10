@@ -53,7 +53,7 @@ class run:
         LR, HR = iterator.get_next()
 
         # Edsr model
-        print("Running EDSR.")
+        print("\nRunning EDSR.")
         edsrObj = edsr.Edsr(self.B, self.F, self.scale)
         out, loss, train_op, psnr, ssim, lr = edsrObj.model(x=LR, y=HR, lr=self.lr)
 
@@ -88,7 +88,7 @@ class run:
             train_val_handle = sess.run(train_val_iterator.string_handle())
 
             print("Training...")
-            for e in range(1, self.epochs):
+            for e in range(1, self.epochs+1):
 
                 sess.run(train_initializer)
                 step, train_loss = 0, 0
@@ -134,7 +134,7 @@ class run:
 
     def upscale(self, path):
         """
-        Upscales an image via model.
+        Upscales an image via model. This loads a checkpoint, not a .pb file.
         """
         fullimg = cv2.imread(path, 3)
 
@@ -161,15 +161,15 @@ class run:
             bicubic_image = cv2.resize(fullimg, None, fx=self.scale, fy=self.scale, interpolation=cv2.INTER_CUBIC)
 
             cv2.imshow('Original image', fullimg)
-            cv2.imshow('HR image', HR_image)
-            cv2.imshow('Bicubic HR image', bicubic_image)
+            cv2.imshow('EDSR upscaled image', HR_image)
+            cv2.imshow('Bicubic upscaled image', bicubic_image)
             cv2.waitKey(0)
 
         sess.close()
 
     def test(self, path):
         """
-        Test single image and calculate psnr.
+        Test single image and calculate psnr. This loads a checkpoint, not a .pb file.
         """
         fullimg = cv2.imread(path, 3)
         width = fullimg.shape[0]
@@ -190,7 +190,6 @@ class run:
             graph_def = sess.graph
             LR_tensor = graph_def.get_tensor_by_name("IteratorGetNext:0")
             HR_tensor = graph_def.get_tensor_by_name("NHWC_output:0")
-            print("Loaded model.")
 
             output = sess.run(HR_tensor, feed_dict={LR_tensor: LR_input_})
 
@@ -205,8 +204,8 @@ class run:
             print("PSNR of bicubic upscaled image: {}".format(self.psnr(cropped, bicubic_image)))
 
             cv2.imshow('Original image', fullimg)
-            cv2.imshow('HR image', HR_image)
-            cv2.imshow('Bicubic HR image', bicubic_image)
+            cv2.imshow('EDSR upscaled image', HR_image)
+            cv2.imshow('Bicubic upscaled image', bicubic_image)
 
             cv2.imwrite("./images/EdsrOutput.png", HR_image)
             cv2.imwrite("./images/BicubicOutput.png", bicubic_image)
@@ -227,8 +226,11 @@ class run:
             return graph
 
     def testFromPb(self, path):
+        """
+        Test single image and calculate psnr. This loads a .pb file.
+        """
         # Read model
-        pbPath = "./models/EDSRq_x{}.pb".format(self.scale)
+        pbPath = "./models/EDSR_x{}.pb".format(self.scale)
 
         # Get graph
         graph = self.load_pb(pbPath)
@@ -260,11 +262,11 @@ class run:
             print("PSNR of bicubic upscaled image: {}".format(self.psnr(cropped, bicubic_image)))
 
             cv2.imshow('Original image', fullimg)
-            cv2.imshow('HR image', HR_image)
-            cv2.imshow('Bicubic HR image', bicubic_image)
+            cv2.imshow('EDSR upscaled image', HR_image)
+            cv2.imshow('Bicubic upscaled image', bicubic_image)
 
-            cv2.imwrite("./images/edsrOutput.png", HR_image)
-            cv2.imwrite("./images/bicubicOutput.png", bicubic_image)
+            cv2.imwrite("./images/EdsrOutput.png", HR_image)
+            cv2.imwrite("./images/BicubicOutput.png", bicubic_image)
             cv2.imwrite("./images/original.png", fullimg)
             cv2.imwrite("./images/input.png", img)
 
@@ -274,14 +276,49 @@ class run:
 
         sess.close()
 
+    def upscaleFromPb(self, path):
+        """
+        Upscale single image by desired model. This loads a .pb file.
+        """
+        # Read model
+        pbPath = "./models/EDSR_x{}.pb".format(self.scale)
+
+        # Get graph
+        graph = self.load_pb(pbPath)
+
+        fullimg = cv2.imread(path, 3)
+        floatimg = fullimg.astype(np.float32) - self.mean
+        LR_input_ = floatimg.reshape(1, floatimg.shape[0], floatimg.shape[1], 3)
+
+        LR_tensor = graph.get_tensor_by_name("IteratorGetNext:0")
+        HR_tensor = graph.get_tensor_by_name("NHWC_output:0")
+
+        with tf.Session(graph=graph) as sess:
+            print("Loading pb...")
+            output = sess.run(HR_tensor, feed_dict={LR_tensor: LR_input_})
+            Y = output[0]
+            HR_image = (Y + self.mean).clip(min=0, max=255)
+            HR_image = (HR_image).astype(np.uint8)
+
+            bicubic_image = cv2.resize(fullimg, None, fx=self.scale, fy=self.scale, interpolation=cv2.INTER_CUBIC)
+
+            cv2.imshow('Original image', fullimg)
+            cv2.imshow('EDSR upscaled image', HR_image)
+            cv2.imshow('Bicubic upscaled image', bicubic_image)
+
+            cv2.waitKey(0)
+            cv2.destroyAllWindows()
+
+        sess.close()
+
     def export(self, quant):
         print("Exporting model...")
 
-        export_dir = "./models/x{}/".format(self.scale)
+        export_dir = "./models/"
         if not os.path.exists(export_dir):
                 os.makedirs(export_dir)
 
-        export_file = "EDSR_x{}.pb".format(self.scale)
+        export_file = "EDSRorig_x{}.pb".format(self.scale)
 
         graph = tf.get_default_graph()
         with graph.as_default():
@@ -302,22 +339,27 @@ class run:
                 graph_def = optimize_for_inference_lib.optimize_for_inference(graph_def, ["IteratorGetNext"],
                                                                             ["NCHW_output"],  # ["NHWC_output"],
                                                                             tf.float32.as_datatype_enum)
+                
+                # Implement certain file shrinking transforms. 2 is recommended.
                 transforms = ["sort_by_execution_order"]
                 if quant == 1:
+                    print("Rounding weights for export.")
                     transforms = ["sort_by_execution_order", "round_weights"]
-                    export_file = "EDSRq_x{}.pb".format(self.scale)
+                    export_file = "EDSR_x{}_q1.pb".format(self.scale)
                 if quant == 2:
-                    print("quanting it up")
+                    print("Quantizing for export.")
                     transforms = ["sort_by_execution_order", "quantize_weights"]
-                    export_file = "EDSRq_x{}.pb".format(self.scale)
+                    export_file = "EDSR_x{}.pb".format(self.scale)
                 if quant == 3:
+                    print("Round weights and quantizing for export.")
                     transforms = ["sort_by_execution_order", "round_weights", "quantize_weights"]
-                    export_file = "EDSRq_x{}.pb".format(self.scale)
+                    export_file = "EDSR_x{}_q3.pb".format(self.scale)
 
                 graph_def = TransformGraph(graph_def, ["IteratorGetNext"],
                                                       ["NCHW_output"],
                                                       transforms)
-                print("File={}".format(export_dir+export_file))
+                
+                print("Exported file = {}".format(export_dir+export_file))
                 with tf.gfile.GFile(export_dir + export_file, 'wb') as f:
                     f.write(graph_def.SerializeToString())
 

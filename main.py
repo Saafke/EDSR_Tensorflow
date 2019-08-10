@@ -13,13 +13,14 @@ from tensorflow.python.client import device_lib
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' #gets rid of avx/fma warning
 
 # TODO:
-# Train models
+# When starting training for x3 and x4, start from pre-trained x2 model.
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     # bools
     parser.add_argument('--train', help='Train the model', action="store_true")
-    parser.add_argument('--test', help='Run tests on the model', action="store_true")
+    parser.add_argument('--test', help='Run PSNR test on an image', action="store_true")
+    parser.add_argument('--upscale', help='Upscale an image with desired scale', action="store_true")
     parser.add_argument('--export', help='Export the model as .pb', action="store_true")
     parser.add_argument('--fromscratch', help='Load previous model for training',action="store_false")
 
@@ -34,8 +35,8 @@ if __name__ == "__main__":
 
     # paths
     parser.add_argument('--image', help='Specify test image', default="./images/original.png")
-    parser.add_argument('--traindir', help='Path to train images', default="/home/weber/Documents/gsoc/datasets/DIV2K_train_HR")
-    parser.add_argument('--validdir', help='Path to train images', default="/home/weber/Documents/gsoc/datasets/Set14")
+    parser.add_argument('--traindir', help='Path to train images')
+    parser.add_argument('--validdir', help='Path to train images')
     args = parser.parse_args()
 
     # INIT
@@ -65,8 +66,11 @@ if __name__ == "__main__":
         run.train(args.traindir, args.validdir)
 
     if args.test:
-        #run.testFromPb(args.image)
-        run.test(args.image)
+        run.testFromPb(args.image)
+        #run.test(args.image)
+    
+    if args.upscale:
+        run.upscaleFromPb(args.image)
         #run.upscale(args.image)
 
     if args.export:
