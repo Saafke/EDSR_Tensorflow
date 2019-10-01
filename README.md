@@ -5,7 +5,7 @@ TensorFlow implementation of [Enhanced Deep Residual Networks for Single Image S
 It was trained on the [Div2K dataset](https://data.vision.ee.ethz.ch/cvl/DIV2K/) - Train Data (HR images).
 
 ## Google Summer of Code with OpenCV
-This repository was made during the 2019 GSoC program for the organization OpenCV. The [trained models (.pb files)](https://github.com/Saafke/EDSR_Tensorflow/tree/master/models/) can easily be used for inference in OpenCV with the 'dnn_superres' module. See the OpenCV documentation for how to do this. (OpenCV code not yet merged, so please wait for this feature.)
+This repository was made during the 2019 GSoC program for the organization OpenCV. The [trained models (.pb files)](https://github.com/Saafke/EDSR_Tensorflow/tree/master/models/) can easily be used for inference in OpenCV with the ['dnn_superres' module](https://github.com/opencv/opencv_contrib/tree/master/modules/dnn_superres). See the OpenCV documentation for how to do this.
 
 ## Requirements
 - tensorflow
